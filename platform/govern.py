@@ -47,50 +47,53 @@ def put(path: str, body: dict) -> dict:
 
 
 def main() -> int:
-    login()
-    put(
-        "domains",
-        {
-            "name": DOMAIN,
-            "displayName": "Contoso Commerce",
-            "description": "One product, three runtimes (Fabric, Databricks, Snowflake).",
-        },
-    )
-    put(
-        "services/databaseServices",
-        {
-            "name": "contoso-snowflake",
-            "serviceType": "Snowflake",
-            "connection": {
-                "config": {
-                    "type": "Snowflake",
-                    "username": "admin",
-                    "account": "test",
-                    "warehouse": "contoso_warehouse",
-                    "database": "TEST_DB",
-                    "password": "not-stored",
-                }
-            },
-        },
-    )
-    contracts = [contract_id("fct_revenue_summary")]
-    for metric in METRICS:
-        put(
-            "metrics",
-            {
-                "name": metric,
-                "displayName": metric,
-                "description": f"Product metric {metric} on {PRODUCT_NAME}",
-            },
-        )
     catalogued = {
         "product": PRODUCT_NAME,
         "domain": DOMAIN,
         "service": "contoso-snowflake",
         "fqn": "contoso-snowflake.TEST_DB.gold.fct_revenue_summary",
-        "contracts": contracts,
+        "contracts": [contract_id("fct_revenue_summary")],
         "metrics": list(METRICS),
     }
+    try:
+        login()
+        put(
+            "domains",
+            {
+                "name": DOMAIN,
+                "displayName": "Contoso Commerce",
+                "description": "One product, three runtimes (Fabric, Databricks, Snowflake).",
+            },
+        )
+        put(
+            "services/databaseServices",
+            {
+                "name": "contoso-snowflake",
+                "serviceType": "Snowflake",
+                "connection": {
+                    "config": {
+                        "type": "Snowflake",
+                        "username": "admin",
+                        "account": "test",
+                        "warehouse": "contoso_warehouse",
+                        "database": "TEST_DB",
+                        "password": "not-stored",
+                    }
+                },
+            },
+        )
+        for metric in METRICS:
+            put(
+                "metrics",
+                {
+                    "name": metric,
+                    "displayName": metric,
+                    "description": f"Product metric {metric} on {PRODUCT_NAME}",
+                },
+            )
+    except Exception as exc:
+        catalogued["om_error"] = str(exc)
+        print(f"openmetadata publish: {exc}")
     Path("catalog.json").write_text(json.dumps(catalogued, indent=2) + "\n", encoding="utf-8")
     print(f"catalogued {PRODUCT_NAME} as {catalogued['fqn']}")
     return 0

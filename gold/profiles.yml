@@ -11,7 +11,7 @@ contoso_gold:
       database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
       schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
       host: "{{ env_var('SNOWFLAKE_HOST') }}"
-      port: "{{ env_var('SNOWFLAKE_PORT') }}"
+      port: "{{ env_var('SNOWFLAKE_PORT') | as_number }}"
       protocol: http
       insecure_mode: true
       threads: 1
