@@ -21,7 +21,7 @@ S = requests.Session()
 
 def login() -> None:
     last = None
-    for _ in range(30):
+    for _ in range(90):
         try:
             r = S.post(
                 f"{OM}/users/login",
