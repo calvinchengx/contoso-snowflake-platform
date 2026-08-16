@@ -7,6 +7,8 @@ import json
 import os
 from pathlib import Path
 
+import time
+
 import requests
 from contoso_product.contracts import DOMAIN, METRICS, PRODUCT_NAME, contract_id
 
@@ -18,16 +20,24 @@ S = requests.Session()
 
 
 def login() -> None:
-    r = S.post(
-        f"{OM}/users/login",
-        json={
-            "email": OM_USER,
-            "password": base64.b64encode(OM_PASSWORD.encode()).decode(),
-        },
-        timeout=60,
-    )
-    r.raise_for_status()
-    S.headers["Authorization"] = f"Bearer {r.json()['accessToken']}"
+    last = None
+    for _ in range(30):
+        try:
+            r = S.post(
+                f"{OM}/users/login",
+                json={
+                    "email": OM_USER,
+                    "password": base64.b64encode(OM_PASSWORD.encode()).decode(),
+                },
+                timeout=60,
+            )
+            r.raise_for_status()
+            S.headers["Authorization"] = f"Bearer {r.json()['accessToken']}"
+            return
+        except Exception as exc:
+            last = exc
+            time.sleep(2)
+    raise last
 
 
 def put(path: str, body: dict) -> dict:

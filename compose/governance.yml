@@ -52,6 +52,12 @@ services:
     image: docker.getcollate.io/openmetadata/server:${OPENMETADATA_VERSION:?see versions.env}
     ports: ["${OM_PORT:-18586}:8585"]
     environment: *om_env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8585/api/v1/system/version || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
     depends_on:
       om-migrate:
         condition: service_completed_successfully
