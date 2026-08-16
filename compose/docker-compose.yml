@@ -1,0 +1,20 @@
+# Snowflake account emulator. Consumer-owned, pin from versions.env.
+services:
+  snowflake:
+    image: ghcr.io/calvinchengx/snowflake-emulator:${SNOWFLAKE_EMULATOR_VERSION:?see versions.env}
+    ports:
+      - "18448:8448"
+    volumes:
+      - ${SNOWFLAKE_DATA:-./data}:/data
+    environment:
+      SNOWFLAKE_ADDR: "0.0.0.0:8448"
+      SNOWFLAKE_DATA_DIR: /data
+      SNOWFLAKE_STAGE_DIR: /stages
+      SNOWFLAKE_DUCKDB_PATH: /data/warehouse.duckdb
+      SNOWFLAKE_POLARIS_URL: embedded
+      SNOWFLAKE_PUBLIC_URL: http://127.0.0.1:18448
+    healthcheck:
+      test: ["CMD", "snowflake-emulator", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

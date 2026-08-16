@@ -1,0 +1,70 @@
+# The claim this repository exists to make: a PUBLISHED snowflake-emulator
+# carries the Contoso gold product + OpenMetadata.
+name: Acceptance
+
+on:
+  repository_dispatch:
+    types: [snowflake-emulator-release]
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Verify the released emulator end to end
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: contoso-snowflake-platform
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          path: contoso-snowflake-platform
+      - uses: actions/checkout@v7
+        with:
+          repository: calvinchengx/contoso-data-product
+          path: contoso-data-product
+      - uses: actions/checkout@v7
+        with:
+          repository: calvinchengx/snowflake-emulator
+          path: snowflake-emulator
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        with:
+          version: "0.12.3"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: GHCR login
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        working-directory: ${{ github.workspace }}
+      - if: github.event_name == 'repository_dispatch'
+        name: Point at the released version
+        run: |
+          uv run --no-project python scripts/set_release.py \
+            "${{ github.event.client_payload.version }}"
+          git --no-pager diff --stat versions.env
+      - run: make doctor
+      - run: make config
+      - run: make up
+      - run: make verify
+      - if: github.event_name == 'repository_dispatch'
+        name: Adopt the version this run just verified
+        env:
+          VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet versions.env; then
+            echo "already pinned at $VERSION; nothing to adopt"
+            exit 0
+          fi
+          git commit -qm "pin $VERSION — adopted by the acceptance run that verified it" versions.env
+          git pull --rebase --quiet origin main
+          git push origin HEAD:main
+          echo "adopted $VERSION" >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        run: make down

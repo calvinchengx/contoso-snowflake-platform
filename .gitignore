@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+state.json
+product_snapshot.json
+catalog.json
+gold/models/
+gold/macros/
+gold/tests/
+gold/target/
+gold/dbt_packages/
+gold/logs/
+data/

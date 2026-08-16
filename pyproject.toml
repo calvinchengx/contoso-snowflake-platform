@@ -1,0 +1,36 @@
+[project]
+name = "contoso-snowflake-platform"
+version = "0.1.0"
+description = "Contoso data product consumer for snowflake-emulator / real Snowflake (gold only)"
+requires-python = ">=3.12"
+dependencies = [
+    "snowflake-target",
+    "contoso-data-product",
+    "requests>=2.32,<3",
+]
+
+[dependency-groups]
+engine = [
+    "snowflake-connector-python>=3.12,<4",
+]
+dbt = [
+    "dbt-snowflake>=1.8,<2",
+]
+dev = ["pytest>=9.0.3,<10", "ruff>=0.14,<0.15"]
+
+[tool.uv]
+package = false
+conflicts = [
+    [
+        { group = "engine" },
+        { group = "dbt" },
+    ],
+]
+
+[tool.uv.sources]
+snowflake-target = { path = "../snowflake-emulator/python/snowflake-target" }
+contoso-data-product = { path = "../contoso-data-product" }
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
