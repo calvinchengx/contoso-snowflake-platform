@@ -1,4 +1,4 @@
-# contoso-snowflake-platform
+# snowflake-platform-tasks
 
 Gold-only Contoso consumer for `snowflake-emulator` / a real Snowflake account.
 `SNOWFLAKE_TARGET=emulator|real`. SQL runs on DuckDB inside the emulator and

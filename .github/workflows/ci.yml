@@ -18,11 +18,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     defaults:
       run:
-        working-directory: contoso-snowflake-platform
+        working-directory: snowflake-platform-tasks
     steps:
       - uses: actions/checkout@v7
         with:
-          path: contoso-snowflake-platform
+          path: snowflake-platform-tasks
       - uses: actions/checkout@v7
         with:
           repository: calvinchengx/contoso-data-product

@@ -1,5 +1,5 @@
 [project]
-name = "contoso-snowflake-platform"
+name = "snowflake-platform-tasks"
 version = "0.1.0"
 description = "Contoso data product consumer for snowflake-emulator / real Snowflake (gold only)"
 requires-python = ">=3.12"
