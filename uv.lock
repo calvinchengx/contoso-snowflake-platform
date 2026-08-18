@@ -396,15 +396,15 @@ wheels = [
 
 [[package]]
 name = "contoso-data-product"
-version = "0.1.0"
-source = { directory = "../contoso-data-product" }
+version = "0.2.0"
+source = { url = "https://github.com/calvinchengx/contoso-data-product/releases/download/v0.2.0/contoso_data_product-0.2.0-py3-none-any.whl" }
+wheels = [
+    { url = "https://github.com/calvinchengx/contoso-data-product/releases/download/v0.2.0/contoso_data_product-0.2.0-py3-none-any.whl", hash = "sha256:9c68512a8b7784944b34da68630fdd2e68dc84b7c977a8abd130e05a6ad7acfe" },
+]
 
 [package.metadata]
 requires-dist = [{ name = "requests", marker = "extra == 'compare'", specifier = ">=2.32" }]
 provides-extras = ["compare"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9.0.3,<10" }]
 
 [[package]]
 name = "cryptography"
@@ -1765,9 +1765,9 @@ engine = [
 
 [package.metadata]
 requires-dist = [
-    { name = "contoso-data-product", directory = "../contoso-data-product" },
+    { name = "contoso-data-product", url = "https://github.com/calvinchengx/contoso-data-product/releases/download/v0.2.0/contoso_data_product-0.2.0-py3-none-any.whl" },
     { name = "requests", specifier = ">=2.32,<3" },
-    { name = "snowflake-target", directory = "../snowflake-emulator/python/snowflake-target" },
+    { name = "snowflake-target", url = "https://github.com/calvinchengx/snowflake-emulator/releases/download/v0.1.1/snowflake_target-0.1.0-py3-none-any.whl" },
 ]
 
 [package.metadata.requires-dev]
@@ -1781,7 +1781,10 @@ engine = [{ name = "snowflake-connector-python", specifier = ">=3.12,<4" }]
 [[package]]
 name = "snowflake-target"
 version = "0.1.0"
-source = { directory = "../snowflake-emulator/python/snowflake-target" }
+source = { url = "https://github.com/calvinchengx/snowflake-emulator/releases/download/v0.1.1/snowflake_target-0.1.0-py3-none-any.whl" }
+wheels = [
+    { url = "https://github.com/calvinchengx/snowflake-emulator/releases/download/v0.1.1/snowflake_target-0.1.0-py3-none-any.whl", hash = "sha256:e151a76a02049aa1b9ab8cf7f2366be33e4d6464e01a4f9a5b18ab3dd27e2e87" },
+]
 
 [[package]]
 name = "snowplow-tracker"

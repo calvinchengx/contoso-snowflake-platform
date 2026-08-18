@@ -82,3 +82,49 @@ def test_set_release_moves_only_the_emulator_pin(tmp_path, monkeypatch):
 def test_gold_only_no_spark():
     for name in ("bronze.py", "silver.py"):
         assert not (ROOT / "platform" / name).exists()
+
+
+def test_no_dependency_comes_from_a_sibling_checkout():
+    """This repository must clone and build on its own.
+
+    Both `snowflake-target` and `contoso-data-product` used to resolve through
+    `path = "../…"`. That is invisible to everyone who already has the siblings
+    on disk and fails for everyone who does not — which is the whole population
+    this repository claims to serve, and DoD item 1 in the family plan.
+
+    It had a second cost that took a while to surface: with no version pin,
+    this was the one consumer a core release could not reach. v0.1.1 and v0.2.0
+    both went past it without anything to bump and without anything failing.
+    """
+    proj = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    offenders = [
+        line.strip()
+        for line in proj.splitlines()
+        if "path = " in line and "../" in line and not line.lstrip().startswith("#")
+    ]
+    assert not offenders, (
+        "a dependency resolves from a sibling checkout, so a lone clone cannot "
+        "build: " + str(offenders)
+    )
+
+
+def test_the_target_wheel_matches_the_pinned_release():
+    """The client wheel and the emulator image come from the SAME release.
+
+    A workspace binary and a client that disagree about the contract is the one
+    mismatch a consumer repository exists to notice, and putting the version in
+    two files is how that disagreement arrives unannounced.
+    """
+    pins = {}
+    for line in (ROOT / "versions.env").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            pins[k.strip()] = v.strip()
+    version = pins["SNOWFLAKE_EMULATOR_VERSION"]
+    proj = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    expected = f"snowflake-emulator/releases/download/v{version}/"
+    assert expected in proj, (
+        f"the snowflake-target wheel does not come from the pinned release "
+        f"v{version}"
+    )

@@ -28,8 +28,20 @@ conflicts = [
 ]
 
 [tool.uv.sources]
-snowflake-target = { path = "../snowflake-emulator/python/snowflake-target" }
-contoso-data-product = { path = "../contoso-data-product" }
+# PUBLISHED WHEELS, not sibling checkouts. Both of these were `path = "../..."`,
+# which meant this repository could not be cloned and built on its own: the
+# path is invisible to everyone who already has the siblings on disk and fails
+# for everyone who does not -- which is the whole population it claims to
+# serve. It also made this the one consumer a core release could not reach,
+# because it had no pin to bump; core v0.1.1 and v0.2.0 both went past it
+# unnoticed.
+#
+# The tag here is kept equal to SNOWFLAKE_EMULATOR_VERSION in versions.env, for
+# the same reason the other platforms keep theirs: a workspace binary and a
+# client that disagree about the contract is the one mismatch a consumer
+# repository exists to notice.
+snowflake-target = { url = "https://github.com/calvinchengx/snowflake-emulator/releases/download/v0.1.1/snowflake_target-0.1.0-py3-none-any.whl" }
+contoso-data-product = { url = "https://github.com/calvinchengx/contoso-data-product/releases/download/v0.2.0/contoso_data_product-0.2.0-py3-none-any.whl" }
 
 [tool.ruff]
 line-length = 88
