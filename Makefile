@@ -31,7 +31,9 @@ config:
 
 verify:
 	$(UV) run --frozen --group engine python platform/provision.py
-	$(UV) run --frozen --group engine python platform/seed_silver.py
+	$(UV) run --frozen --group engine python platform/ingest.py
+	$(UV) run --frozen --group engine python platform/bronze.py
+	$(UV) run --frozen --group dbt python platform/silver.py
 	$(UV) run --frozen --group dbt python platform/gold.py
 	$(UV) run --frozen --group engine python platform/govern.py
 
