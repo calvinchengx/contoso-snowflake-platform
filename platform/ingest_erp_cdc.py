@@ -30,7 +30,7 @@ import os
 import pathlib
 import time
 
-from confluent_kafka import Consumer, TopicPartition
+from confluent_kafka import Consumer, KafkaError, KafkaException, TopicPartition
 
 from sources import ERP_DB, ERP_HOST, ERP_PORT, ERP_TOPIC, ERP_USER, REDPANDA
 
@@ -49,9 +49,36 @@ COLUMNS = [
 ]
 
 
-def watermark(consumer: Consumer) -> int:
-    _, high = consumer.get_watermark_offsets(TopicPartition(TOPIC, 0), timeout=30)
-    return high
+def watermark(consumer: Consumer, *, ready_timeout: float = 180.0) -> int:
+    """The high watermark, having first waited for the topic to exist.
+
+    `make up --wait` WAITS ON CONTAINER HEALTH, and a healthy Kafka Connect is
+    not a created topic. The connector registers, then creates the topic, then
+    snapshots; asking inside that window raises `_UNKNOWN_PARTITION`, which
+    reads like a failure and means "not yet". This step failed three times in
+    one afternoon for that reason alone, and each failure looked like a
+    different problem because the message names a partition rather than a race.
+
+    Bounded, because a topic that never appears is a real fault -- a connector
+    that failed to register, or a name that does not match -- and waiting
+    forever would turn it into a hang instead of an error.
+    """
+    deadline = time.time() + ready_timeout
+    while True:
+        try:
+            _, high = consumer.get_watermark_offsets(TopicPartition(TOPIC, 0), timeout=30)
+            return high
+        except KafkaException as exc:
+            code = exc.args[0].code() if exc.args else None
+            if code != KafkaError._UNKNOWN_PARTITION:
+                raise
+            if time.time() >= deadline:
+                raise SystemExit(
+                    f"the topic {TOPIC} did not appear within {ready_timeout:.0f}s. "
+                    f"The connector registers it, so this is a connector fault "
+                    f"rather than a slow start -- check contoso-erp-connect."
+                ) from exc
+            time.sleep(2.0)
 
 
 def settled(consumer: Consumer, polls: int = 3, gap: float = 5.0) -> int:
