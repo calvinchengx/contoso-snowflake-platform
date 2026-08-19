@@ -8,19 +8,20 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 VERSIONS = ROOT / "versions.env"
-PYPROJECT = ROOT / "pyproject.toml"
 TRACKS_THE_RELEASE = ("SNOWFLAKE_EMULATOR_VERSION",)
 SEMVER = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.\-]+)?$")
 
-# The release tag inside the snowflake-target wheel URL in pyproject.toml. The
-# image pin and the Python client must come from the SAME release: a workspace
-# binary and a client that disagree about the contract is the one mismatch this
-# repository exists to notice, not to ship. test_the_target_wheel_matches_the_
-# pinned_release already asserts it -- so moving versions.env alone did not
-# merely leave the wheel behind, it left a main that fails its own test.
-WHEEL_TAG = re.compile(
-    r"(snowflake-emulator/releases/download/v)\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.\-]+)?(/)"
-)
+# THE CLIENT WHEEL IS NO LONGER HERE. Until the split this repository held both
+# the image pin and the snowflake-target wheel URL, and this script moved the
+# pair. The wheel went to the product with the code that imports it, so the two
+# pins now live in two repositories and NOTHING IN EITHER ONE ALONE CAN SEE THE
+# PAIR.
+#
+# What replaces the check is `check_product_pin.py`, which `make verify` runs
+# against whatever product this platform was pointed at, before any step. The
+# consequence is deliberate and worth stating: an emulator release now needs
+# TWO bumps, and forgetting the second one fails the run loudly rather than
+# quietly verifying a client and an image that disagree.
 
 
 def set_version(text: str, version: str) -> tuple[str, dict[str, str]]:
@@ -36,16 +37,6 @@ def set_version(text: str, version: str) -> tuple[str, dict[str, str]]:
             moved[key] = old
             lines[i] = f"{key}={version}\n"
     return "".join(lines), moved
-
-
-def set_wheel(text: str, version: str) -> tuple[str, int]:
-    """Point the snowflake-target wheel URL at release `version`.
-
-    Only the tag moves. The wheel's own version is the package's, not the
-    emulator's, and the two are deliberately unrelated: a release can ship an
-    unchanged client.
-    """
-    return WHEEL_TAG.subn(rf"\g<1>{version}\g<2>", text)
 
 
 def main() -> int:
@@ -64,18 +55,12 @@ def main() -> int:
         note = "  (unchanged)" if old == version else ""
         print(f"  {key}: {old} -> {version}{note}")
 
-    # The Python client comes from the same release as the image.
-    proj = PYPROJECT.read_text(encoding="utf-8")
-    moved_wheel, n = set_wheel(proj, version)
-    if n == 0:
-        sys.exit(
-            f"{PYPROJECT.name} has no snowflake-target wheel URL to move. "
-            f"If it went back to a path source, this script and "
-            f"test_the_target_wheel_matches_the_pinned_release both need a look."
-        )
-    PYPROJECT.write_text(moved_wheel, encoding="utf-8")
-    print(f"  snowflake-target wheel: -> v{version}")
-    print("  run `uv lock` to refresh the lockfile")
+    print(
+        f"  the snowflake-target wheel is the PRODUCT's pin -- move it there too:\n"
+        f"    python scripts/set_release.py {version}   (here, done)\n"
+        f"    then in the product: point snowflake-target at v{version} and `uv lock`\n"
+        f"  `make verify` refuses to run until the two agree."
+    )
     return 0
 
 

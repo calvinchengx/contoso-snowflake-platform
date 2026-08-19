@@ -1,5 +1,10 @@
 # The claim this repository exists to make: a PUBLISHED snowflake-emulator
-# carries the Contoso gold product + OpenMetadata.
+# carries the Contoso product end to end -- ingest, bronze, silver, gold and the
+# ODCS contracts -- with OpenMetadata alongside.
+#
+# SINCE THE SPLIT, THAT TAKES TWO REPOSITORIES. This one owns the stack; the
+# steps live in contoso-data-product-snowflake-tasks and are checked out below.
+# `make verify` without a PRODUCT would run the empty ./product mount point.
 name: Acceptance
 
 on:
@@ -24,6 +29,24 @@ jobs:
         with:
           fetch-depth: 0
           path: snowflake-platform-tasks
+      # THE PRODUCT THIS PLATFORM RUNS. It is checked out rather than named in
+      # the Makefile, which holds no product identifier -- the property that
+      # makes "a second product can use this platform unchanged" testable.
+      - uses: actions/checkout@v7
+        with:
+          repository: calvinchengx/contoso-data-product-snowflake-tasks
+          path: contoso-data-product-snowflake-tasks
+      # The vendors are DECLARED in contoso-sources and materialised from it, so
+      # compose.py hard-requires the checkout beside this one. It is not
+      # optional and not a fixture we could vendor: the point of reading the
+      # declaration is that this platform's vendor list is not a copy.
+      #
+      # It was missing until the split -- `make up` could not have succeeded in
+      # this workflow since the four vendors were added.
+      - uses: actions/checkout@v7
+        with:
+          repository: calvinchengx/contoso-sources
+          path: contoso-sources
       - uses: actions/checkout@v7
         with:
           repository: calvinchengx/contoso-data-product
@@ -43,23 +66,23 @@ jobs:
         working-directory: ${{ github.workspace }}
       - if: github.event_name == 'repository_dispatch'
         name: Point at the released version
-        # `uv lock` is not housekeeping, it is the second half of the move.
-        # set_release.py rewrites versions.env AND the wheel URL in
-        # pyproject.toml, but every make target runs `uv run --frozen`, and
-        # --frozen installs what uv.lock names without ever reading
-        # pyproject.toml. Leave the lockfile behind and this job pulls the NEW
-        # image, runs it against the OLD client, and passes -- verifying a pair
-        # no consumer will ever have, which is the one mismatch this repository
-        # exists to notice.
+        # THE CLIENT WHEEL IS THE PRODUCT'S PIN NOW, and this job does not reach
+        # into another repository to move it. If the product still installs the
+        # previous client, `make verify` refuses at check_product_pin.py before
+        # any step runs, and this run goes RED.
+        #
+        # That is the intended behaviour rather than an oversight: the
+        # alternative is bumping the checked-out product in place and publishing
+        # a green for a pair that exists in no commit anywhere. A release now
+        # needs two bumps, and this is where a forgotten second one surfaces.
         run: |
           uv run --no-project python scripts/set_release.py \
             "${{ github.event.client_payload.version }}"
-          uv lock
-          git --no-pager diff --stat versions.env pyproject.toml uv.lock
+          git --no-pager diff --stat versions.env
       - run: make doctor
       - run: make config
-      - run: make up
-      - run: make verify
+      - run: make up PRODUCT=../contoso-data-product-snowflake-tasks
+      - run: make verify PRODUCT=../contoso-data-product-snowflake-tasks
       - if: github.event_name == 'repository_dispatch'
         name: Adopt the version this run just verified
         env:
@@ -67,14 +90,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet versions.env pyproject.toml uv.lock; then
+          if git diff --quiet versions.env; then
             echo "already pinned at $VERSION; nothing to adopt"
             exit 0
           fi
           git commit -qm "pin $VERSION — adopted by the acceptance run that verified it" \
-            versions.env pyproject.toml uv.lock
+            versions.env
           git pull --rebase --quiet origin main
           git push origin HEAD:main
           echo "adopted $VERSION" >> "$GITHUB_STEP_SUMMARY"
       - if: always()
-        run: make down
+        run: make down PRODUCT=../contoso-data-product-snowflake-tasks
