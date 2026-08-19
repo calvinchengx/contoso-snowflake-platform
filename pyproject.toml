@@ -33,6 +33,36 @@ dbt = [
 dev = ["pytest>=9.0.3,<10", "ruff>=0.14,<0.15"]
 
 [tool.uv]
+# THIRTEEN ADVISORIES, AND NONE OF THEM HAS A RELEASE TO UPGRADE INTO.
+#
+# All three packages arrive through dbt-snowflake, which pins an older
+# snowflake-connector-python, which in turn caps cryptography and pyopenssl.
+# The lock therefore carried BOTH versions of each -- the patched one for this
+# repository's own dependency on the connector, and a vulnerable one for dbt's:
+#
+#     cryptography  45.0.7  and  50.0.0
+#     pyopenssl     25.3.0  and  26.4.0
+#     sqlparse      0.5.5            (dbt-core declares sqlparse<0.6.0)
+#
+# A constraint cannot fix that: narrowing cannot satisfy `<0.6.0` and
+# `>=0.6.0` at once. The upper bounds have to be overridden, which is what
+# snowflake-emulator did for the same sqlparse advisories.
+#
+# Deliberate, and checked rather than assumed: `make verify` runs real
+# dbt-snowflake from this lock end to end -- ingest, bronze, silver, gold and
+# 52 contracts -- so a break in what dbt actually uses shows up as a failing
+# pipeline rather than as a passing install.
+#
+# DELETE THESE when dbt-snowflake takes a connector that allows the patched
+# versions, rather than leaving them quietly pinning the ecosystem.
+override-dependencies = [
+    "cryptography>=50.0.0",
+    "pyopenssl>=26.0.0",
+    "sqlparse>=0.6.0",
+    # The connector is what caps the two above; dbt-snowflake pins it back.
+    "snowflake-connector-python>=4.7.2",
+]
+
 package = false
 conflicts = [
     [
