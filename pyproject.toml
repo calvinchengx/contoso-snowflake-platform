@@ -54,8 +54,8 @@ conflicts = [
 # the same reason the other platforms keep theirs: a workspace binary and a
 # client that disagree about the contract is the one mismatch a consumer
 # repository exists to notice.
-snowflake-target = { url = "https://github.com/calvinchengx/snowflake-emulator/releases/download/v0.1.4/snowflake_target-0.1.0-py3-none-any.whl" }
-contoso-data-product = { url = "https://github.com/calvinchengx/contoso-data-product/releases/download/v0.3.0/contoso_data_product-0.3.0-py3-none-any.whl" }
+snowflake-target = { url = "https://github.com/calvinchengx/snowflake-emulator/releases/download/v0.1.5/snowflake_target-0.1.0-py3-none-any.whl" }
+contoso-data-product = { url = "https://github.com/calvinchengx/contoso-data-product/releases/download/v0.3.1/contoso_data_product-0.3.1-py3-none-any.whl" }
 
 [tool.ruff]
 line-length = 88
