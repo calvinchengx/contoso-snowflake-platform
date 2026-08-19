@@ -7,6 +7,20 @@ dependencies = [
     "snowflake-target",
     "contoso-data-product",
     "requests>=2.32,<3",
+    # THE ERP VENDOR IS A CHANGE STREAM, so a Kafka client is the only way to
+    # consume it. Reading erp.customer directly would be a snapshot, and a
+    # snapshot cannot say that a customer was in Germany before they were in
+    # France -- which is the entire reason this vendor exists.
+    "confluent-kafka>=2.5,<3",
+    # Not to ingest with: the CDC step reconciles the stream's net effect
+    # against the ERP's own row count, because a connector that stopped early
+    # produces a stream that is stable, well-formed and short.
+    "psycopg[binary]>=3.2,<4",
+    # The reference vendor ships Parquet. This engine's COPY INTO accepts
+    # TYPE = PARQUET, reports ok and loads nothing (snowflake-emulator#20), so
+    # the parts are rewritten as CSV on the way into the stage -- lossless for
+    # a flat table, and reversible the day that copy path works.
+    "pyarrow>=18,<24",
 ]
 
 [dependency-groups]

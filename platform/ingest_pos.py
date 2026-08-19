@@ -20,6 +20,7 @@ memory -- the exact thing paging removes -- and a directory of parts is what
 
 from __future__ import annotations
 
+import csv
 import pathlib
 
 import requests
@@ -32,7 +33,14 @@ STAGE = pathlib.Path(__file__).resolve().parent.parent / "stages"
 # (operation path, landed subdirectory, part extension). Named from the OpenAPI
 # spec's operations, so a spec change that renames a route fails here rather
 # than landing an empty file that only bronze will notice.
-FEEDS = [("/api/v1/export/customers", "contoso_pos_customers", "csv")]
+FEEDS = [
+    ("/api/v1/export/customers", "contoso_pos_customers", "csv"),
+    # ORDERS ARE JSON LINES, so they land as one JSON document per CSV row --
+    # the same shape Contoso Web's pages take, and for the same reason: this
+    # engine's TYPE = JSON copy reports `ok` and loads nothing
+    # (snowflake-emulator#20). Silver parses the text.
+    ("/api/v1/export/orders", "contoso_pos_orders", "jsonl"),
+]
 
 
 def fetch(path: str, key: str, page: int | None = None) -> requests.Response:
@@ -60,7 +68,7 @@ def main() -> int:
     for path, subdir, ext in FEEDS:
         dest = STAGE / subdir
         dest.mkdir(parents=True, exist_ok=True)
-        for stale in dest.glob(f"*.{ext}"):
+        for stale in dest.glob("*.csv"):
             stale.unlink()
 
         first = fetch(path, api_key, 1)
@@ -78,7 +86,18 @@ def main() -> int:
             assert int(r.headers["X-Page"]) == page, (r.headers.get("X-Page"), page)
             blob = r.content
             assert blob, f"{path} page {page} returned an empty body"
-            (dest / f"part-{page:04d}.{ext}").write_bytes(blob)
+            out = dest / f"part-{page:04d}.csv"
+            if ext == "csv":
+                out.write_bytes(blob)
+            else:
+                # QUOTE_ALL: a JSON document is full of commas and quotes and
+                # has to survive as ONE field.
+                docs = [ln for ln in blob.decode("utf-8").splitlines() if ln.strip()]
+                with out.open("w", encoding="utf-8", newline="") as fh:
+                    w = csv.writer(fh, quoting=csv.QUOTE_ALL)
+                    w.writerow(["doc"])
+                    for d in docs:
+                        w.writerow([d])
             written += len(blob)
             parts += 1
 
