@@ -128,3 +128,71 @@ def test_the_target_wheel_matches_the_pinned_release():
         f"the snowflake-target wheel does not come from the pinned release "
         f"v{version}"
     )
+
+
+def test_the_locked_wheel_matches_the_pinned_release():
+    """The LOCKFILE is what decides which client actually runs.
+
+    test_the_target_wheel_matches_the_pinned_release checks pyproject.toml,
+    and that is the declaration. It is not what gets installed: every make
+    target runs `uv run --frozen`, and --frozen resolves from uv.lock without
+    reading pyproject.toml at all. So a bump that moves versions.env and
+    pyproject.toml but not the lock leaves the pin pointing one way and the
+    installed client pointing the other, with nothing between them.
+    """
+    pins = {}
+    for line in (ROOT / "versions.env").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            pins[k.strip()] = v.strip()
+    version = pins["SNOWFLAKE_EMULATOR_VERSION"]
+
+    lock = (ROOT / "uv.lock").read_text(encoding="utf-8")
+    stale = [
+        line.strip()
+        for line in lock.splitlines()
+        if "snowflake-emulator/releases/download/" in line
+        and f"/download/v{version}/" not in line
+    ]
+    assert not stale, (
+        f"uv.lock still installs snowflake-target from a release other than "
+        f"the pinned v{version}. Run `python scripts/set_release.py {version}` "
+        f"AND `uv lock` -- the lockfile is what --frozen installs.\n  "
+        + "\n  ".join(stale)
+    )
+
+
+def test_set_release_moves_the_wheel_as_well_as_the_pin():
+    """Moving versions.env alone publishes a main that fails its own test.
+
+    set_release.py used to touch versions.env only, while pyproject.toml
+    carried the wheel URL and test_the_target_wheel_matches_the_pinned_release
+    asserted the two agree. So the script's own output broke the suite.
+    """
+    src = (ROOT / "scripts" / "set_release.py").read_text(encoding="utf-8")
+    assert "WHEEL_TAG" in src and "PYPROJECT" in src, (
+        "set_release.py must move the snowflake-target wheel URL as well as "
+        "SNOWFLAKE_EMULATOR_VERSION, or it leaves the repository failing "
+        "test_the_target_wheel_matches_the_pinned_release"
+    )
+
+
+def test_the_acceptance_run_adopts_every_file_the_bump_touches():
+    """A half-adopted pin publishes a main that contradicts itself.
+
+    The adopt step commits what the bump changed. The bump changes
+    versions.env and pyproject.toml, and `uv lock` then changes uv.lock.
+    Commit only the first and main carries a pin the other two deny.
+    """
+    wf = (ROOT / ".github" / "workflows" / "acceptance.yml").read_text(encoding="utf-8")
+    adopt = wf[wf.index("Adopt the version this run just verified") :]
+    for name in ("versions.env", "pyproject.toml", "uv.lock"):
+        assert adopt.count(name) >= 2, (
+            f"the adopt step must both TEST and COMMIT {name}; a file left out "
+            f"of either half is a pin that main contradicts"
+        )
+    assert "uv lock" in wf, (
+        "the dispatch must refresh the lockfile after set_release.py, or the "
+        "run verifies the new image against the client the lock still names"
+    )

@@ -43,10 +43,19 @@ jobs:
         working-directory: ${{ github.workspace }}
       - if: github.event_name == 'repository_dispatch'
         name: Point at the released version
+        # `uv lock` is not housekeeping, it is the second half of the move.
+        # set_release.py rewrites versions.env AND the wheel URL in
+        # pyproject.toml, but every make target runs `uv run --frozen`, and
+        # --frozen installs what uv.lock names without ever reading
+        # pyproject.toml. Leave the lockfile behind and this job pulls the NEW
+        # image, runs it against the OLD client, and passes -- verifying a pair
+        # no consumer will ever have, which is the one mismatch this repository
+        # exists to notice.
         run: |
           uv run --no-project python scripts/set_release.py \
             "${{ github.event.client_payload.version }}"
-          git --no-pager diff --stat versions.env
+          uv lock
+          git --no-pager diff --stat versions.env pyproject.toml uv.lock
       - run: make doctor
       - run: make config
       - run: make up
@@ -58,11 +67,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet versions.env; then
+          if git diff --quiet versions.env pyproject.toml uv.lock; then
             echo "already pinned at $VERSION; nothing to adopt"
             exit 0
           fi
-          git commit -qm "pin $VERSION — adopted by the acceptance run that verified it" versions.env
+          git commit -qm "pin $VERSION — adopted by the acceptance run that verified it" \
+            versions.env pyproject.toml uv.lock
           git pull --rebase --quiet origin main
           git push origin HEAD:main
           echo "adopted $VERSION" >> "$GITHUB_STEP_SUMMARY"
