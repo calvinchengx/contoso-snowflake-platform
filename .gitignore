@@ -12,3 +12,8 @@ gold/target/
 gold/dbt_packages/
 gold/logs/
 data/
+
+# Generated from contoso-sources at `make up` -- never edited, never committed.
+compose/.generated/
+# The internal stage, written by ingest and read by COPY INTO.
+stages/

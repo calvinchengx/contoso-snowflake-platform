@@ -79,9 +79,22 @@ def test_set_release_moves_only_the_emulator_pin(tmp_path, monkeypatch):
     assert "OPENMETADATA_VERSION=1.13.2" in new
 
 
-def test_gold_only_no_spark():
-    for name in ("bronze.py", "silver.py"):
-        assert not (ROOT / "platform" / name).exists()
+def test_bronze_is_sql_not_spark():
+    """This cell builds bronze with SQL, because Snowflake has no DataFrames.
+
+    The test used to assert there was no bronze.py at all, which was an honest
+    statement of a cell that seeded empty silver tables and built gold over
+    them. There is a bronze now, and the invariant that actually matters
+    survived the change: it is `COPY INTO` from a stage — what a Snowflake team
+    writes — and not a Spark session smuggled in to make this cell look like the
+    others.
+    """
+    bronze = ROOT / "platform" / "bronze.py"
+    assert bronze.exists(), "bronze.py is gone — this cell landed one deliberately"
+    src = bronze.read_text(encoding="utf-8")
+    assert "COPY INTO" in src, "bronze must load through the stage"
+    for banned in ("pyspark", "SparkSession", "databricks.connect"):
+        assert banned not in src, f"bronze reaches for Spark ({banned})"
 
 
 def test_no_dependency_comes_from_a_sibling_checkout():
