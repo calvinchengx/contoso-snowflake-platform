@@ -31,6 +31,11 @@ def main() -> int:
     env.setdefault("SNOWFLAKE_DATA", str(ROOT / "data"))
     Path(env["SNOWFLAKE_DATA"]).mkdir(parents=True, exist_ok=True)
     os.chmod(env["SNOWFLAKE_DATA"], 0o777)
+    # The internal stage, host-side. 0777 for the same reason as data/: the
+    # emulator runs as nonroot and has to write the files ingest puts here.
+    env.setdefault("SNOWFLAKE_STAGES", str(ROOT / "stages"))
+    Path(env["SNOWFLAKE_STAGES"]).mkdir(parents=True, exist_ok=True)
+    os.chmod(env["SNOWFLAKE_STAGES"], 0o777)
     return subprocess.call(cmd, cwd=ROOT, env=env)
 
 

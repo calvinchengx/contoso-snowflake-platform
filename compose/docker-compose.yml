@@ -6,6 +6,13 @@ services:
       - "18448:8448"
     volumes:
       - ${SNOWFLAKE_DATA:-./data}:/data
+      # THE INTERNAL STAGE, as a host directory. SNOWFLAKE_STAGE_DIR pointed at
+      # a path inside the container, so nothing outside could put a file there
+      # and `COPY INTO` had nothing to read -- which is why this cell has only
+      # ever had empty silver tables. Ingest writes the vendors' bytes here and
+      # the warehouse copies them in, which is what a Snowflake team does with
+      # an internal stage.
+      - ${SNOWFLAKE_STAGES:-./stages}:/stages
     environment:
       SNOWFLAKE_ADDR: "0.0.0.0:8448"
       SNOWFLAKE_DATA_DIR: /data
