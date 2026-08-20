@@ -79,6 +79,16 @@ jobs:
           uv run --no-project python scripts/set_release.py \
             "${{ github.event.client_payload.version }}"
           git --no-pager diff --stat versions.env
+      # THE BYTES, not just the declaration checked out above. compose.py
+      # refuses without them, and that refusal is why this job went red the
+      # first time the cell had vendors at all: mokapi does not fail on an
+      # empty _data/, it generates bodies from the OpenAPI schema and answers
+      # every request 200, so the alternative to refusing is a medallion built
+      # on invented rows. The sibling platforms that made this split first
+      # carry the same step.
+      - name: Materialise the vendor exports
+        run: make sources
+        working-directory: contoso-sources
       - run: make doctor
       - run: make config
       - run: make up PRODUCT=../contoso-data-product-snowflake-tasks
