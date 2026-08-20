@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 import sys
 from pathlib import Path
 
@@ -88,36 +89,89 @@ def main() -> int:
     Path(env["SNOWFLAKE_STAGES"]).mkdir(parents=True, exist_ok=True)
     os.chmod(env["SNOWFLAKE_STAGES"], 0o777)
     rc = subprocess.call(cmd, cwd=ROOT, env=env)
-    if rc != 0 and args and args[0] == "up":
-        rc = tolerate_finished_jobs(cmd[:-len(args)], env, rc)
+    if args and args[0] == "up":
+        rc = wait_for_jobs(cmd[:-len(args)], env, rc)
     return rc
 
 
-def tolerate_finished_jobs(base: list[str], env: dict, rc: int) -> int:
-    """`--wait` calls a finished job a failure. Two of ours finish by design.
+def wait_for_jobs(base: list[str], env: dict, rc: int) -> int:
+    """`up --wait` starts the one-shot jobs. It does not wait for them to DO
+    anything, and the next step needs them finished.
 
-    `docker compose up --wait` waits for every service to be running or
-    healthy, and a container that has EXITED does not qualify -- even when it
-    exited 0, which is exactly what a one-shot job should do. This stack has
-    two: `contoso-erp-seed` loads the vendor's database, and `om-migrate`
-    migrates OpenMetadata's schema. Both run once and stop.
+    Two services here are steps rather than servers -- `contoso-erp-seed`
+    replays the vendor's history into its database, and `om-migrate` migrates
+    OpenMetadata's schema. Compose declares both `restart: no`, which is how
+    this function finds them without matching on a name.
 
-    So `make up` returned 1 on a stack that had come up correctly. In CI that
-    stops the job before `make verify` runs, and the failure is reported
-    against a step that never executed rather than the one that misread its
-    own success. Measured here: every service healthy, exit 1, and
-    `compose-contoso-erp-seed-1 exited (0)` the only complaint.
+    `--wait` gets them wrong in BOTH directions, and this repository has now
+    been bitten by each:
 
-    The same shape as the Kafka race this repository fixed earlier -- a wait
-    condition that does not describe the thing being waited for. So the exit
-    code is re-derived from what the containers actually did. A non-zero exit,
-    or a service that never ran, is still a failure.
+      a job that has FINISHED is "not running", so `up --wait` failed on a
+      stack that had come up correctly -- and in CI that stops the run before
+      `make verify`, reporting the failure against a step that never executed;
+
+      a job that is STILL RUNNING is "started", so `up` returned while the ERP
+      seed was mid-replay and ingest read a database with nothing in it. That
+      is the failure a first fix here made WORSE, by accepting `running` as
+      good enough for a job whose whole purpose is to finish.
+
+    So the wait is on completion: every `restart: no` service must have exited,
+    and exited 0. Bounded, because a seed that never finishes is a fault to
+    report rather than to hang on.
     """
+    jobs = one_shot_services(base, env)
+    if not jobs:
+        return rc
+    deadline = time.time() + 600.0
+    while True:
+        states = service_states(base, env)
+        if states is None:
+            return rc
+        pending = [j for j in jobs if states.get(j, ("", 0))[0] != "exited"]
+        failed = [f"{j}: exited {states[j][1]}" for j in jobs
+                  if states.get(j, ("", 0))[0] == "exited" and states[j][1] != 0]
+        if failed:
+            print("compose: " + "; ".join(failed))
+            return rc or 1
+        if not pending:
+            break
+        if time.time() >= deadline:
+            print(f"compose: still running after 600s: {', '.join(pending)}")
+            return rc or 1
+        time.sleep(2.0)
+
+    # A service that has exited 0 is fine whether or not compose declares it
+    # `restart: no`. om-migrate does not, and flagging it broken for finishing
+    # its job was this function's first mistake in the other direction.
+    broken = [f"{n}: {s} ({c})" for n, (s, c) in service_states(base, env).items()
+              if s not in ("running", "restarting") and not (s == "exited" and c == 0)]
+    if broken:
+        print("compose: " + "; ".join(broken))
+        return rc
+    print(f"compose: up -- services running, jobs finished ({', '.join(sorted(jobs))})")
+    return 0
+
+
+def one_shot_services(base: list[str], env: dict) -> set[str]:
+    """Services compose declares `restart: no` -- steps, not servers."""
+    out = subprocess.run(base + ["config", "--format", "json"],
+                         cwd=ROOT, env=env, capture_output=True, text=True)
+    if out.returncode != 0:
+        return set()
+    try:
+        cfg = json.loads(out.stdout)
+    except json.JSONDecodeError:
+        return set()
+    return {n for n, s in cfg.get("services", {}).items() if s.get("restart") == "no"}
+
+
+def service_states(base: list[str], env: dict):
+    """{service: (state, exit_code)} for everything compose knows about."""
     ps = subprocess.run(base + ["ps", "-a", "--format", "json"],
                         cwd=ROOT, env=env, capture_output=True, text=True)
     if ps.returncode != 0 or not ps.stdout.strip():
-        return rc
-    bad = []
+        return None
+    states = {}
     for line in ps.stdout.splitlines():
         line = line.strip()
         if not line:
@@ -125,16 +179,9 @@ def tolerate_finished_jobs(base: list[str], env: dict, rc: int) -> int:
         try:
             svc = json.loads(line)
         except json.JSONDecodeError:
-            return rc
-        state, code = svc.get("State", ""), svc.get("ExitCode", 0)
-        if state in ("running", "restarting") or (state == "exited" and code == 0):
-            continue
-        bad.append(f"{svc.get('Service', '?')}: {state} ({code})")
-    if bad:
-        print("compose: " + "; ".join(bad))
-        return rc
-    print("compose: up -- every service is running, or is a job that finished")
-    return 0
+            return None
+        states[svc.get("Service", "?")] = (svc.get("State", ""), svc.get("ExitCode", 0))
+    return states
 
 
 if __name__ == "__main__":
