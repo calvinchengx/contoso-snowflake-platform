@@ -10,6 +10,7 @@ import time
 import sys
 from pathlib import Path
 
+PROJECT = "snowflake-tasks"
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "compose" / ".generated"
 FILES = ["compose/docker-compose.yml"]
@@ -65,9 +66,32 @@ def vendor_fragment() -> Path:
 
 def main() -> int:
     args = sys.argv[1:]
+    # NAMED, NOT INFERRED. Without `-p`, docker derives the project name from
+    # the directory holding the compose file -- which here is `compose/`, a name
+    # this repository chose for tidiness and not as an identifier.
+    #
+    # `databricks-platform-jobs` keeps its compose file in a directory called
+    # `compose/` too, so both stacks were project `compose` and either
+    # platform's `make down` tore down the other's containers. Measured, not
+    # imagined: bringing this stack down took `compose-databricks-1` with it,
+    # and the only reason it was noticed is that `down` then refused to remove
+    # the network with "Resource is still in use". Had the other run been
+    # mid-flight it would have read as a container dying for no reason, with
+    # nothing in that repository's logs to explain it.
+    #
+    # THE GENERIC NAME IS THE DEFECT, not the pair. Naming only one side fixes
+    # this collision and leaves the next platform that keeps a `compose/`
+    # directory to rediscover it. The three Airflow platforms in this family
+    # already pass their own `-p`; the engine-native ones never did.
+    #
+    # NOTE ON UPGRADING: a stack started under the old name is invisible to this
+    # one. Run `make down` on the previous version first, or remove the leftover
+    # `compose`-project containers by hand.
     cmd = [
         "docker",
         "compose",
+        "-p",
+        PROJECT,
         "--env-file",
         "versions.env",
         "--profile",

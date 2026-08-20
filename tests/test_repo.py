@@ -247,3 +247,36 @@ def test_the_acceptance_run_adopts_every_file_the_bump_touches():
         assert gone not in adopt, (
             f"the adopt step commits {gone}, which the bump no longer touches"
         )
+
+
+def test_the_compose_project_is_named_rather_than_inferred():
+    """Two platforms in this family were both project `compose`.
+
+    Without `-p`, docker derives the project name from the directory holding the
+    compose file. This repository keeps its at `compose/`, chosen for tidiness
+    and not as an identifier -- and `databricks-platform-jobs` does the same, so
+    both stacks were project `compose` and either platform's `make down` tore
+    down the other's containers.
+
+    Measured rather than imagined: bringing this stack down took
+    `compose-databricks-1` with it, and it was noticed only because `down` then
+    refused to remove the network with "Resource is still in use". Had the other
+    run been mid-flight it would have read as a container dying for no reason,
+    with nothing in that repository's logs to explain it.
+
+    THE GENERIC NAME IS THE DEFECT, not the pair of them. A name derived from a
+    directory collides with whatever else picks that directory name next, so
+    this asserts that a name is CHOSEN -- and that it is not the inferred one.
+    """
+    src = (ROOT / "scripts" / "compose.py").read_text(encoding="utf-8")
+    assert '"-p"' in src, (
+        "the compose project name is inferred from the directory, so this stack "
+        "shares a project with any other platform whose compose file sits in a "
+        "directory of the same name"
+    )
+    m = re.search(r'^PROJECT = "([^"]+)"', src, re.M)
+    assert m, "no PROJECT constant to pass to -p"
+    assert m.group(1) != "compose", (
+        "the project is named `compose`, which is the inferred name this exists "
+        "to replace"
+    )
