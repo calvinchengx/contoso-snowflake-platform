@@ -17,6 +17,16 @@ services:
       SNOWFLAKE_ADDR: "0.0.0.0:8448"
       SNOWFLAKE_DATA_DIR: /data
       SNOWFLAKE_STAGE_DIR: /stages
+      # WHERE THE STAGE IS FROM THE CLIENT'S SIDE, which is not where it is from
+      # the server's. The steps run on the HOST and the warehouse runs in a
+      # container, so the upload response has to name a path the client can
+      # actually write to -- the host side of the bind mount above, not
+      # `/stages`, which means nothing out there.
+      #
+      # The Airflow 3 platform needs no equivalent: its client is a container
+      # that mounts the same volume at the same path, so server and client agree
+      # without being told.
+      SNOWFLAKE_STAGE_CLIENT_DIR: ${SNOWFLAKE_STAGES:-./stages}
       SNOWFLAKE_DUCKDB_PATH: /data/warehouse.duckdb
       SNOWFLAKE_POLARIS_URL: embedded
       SNOWFLAKE_PUBLIC_URL: http://127.0.0.1:18448
