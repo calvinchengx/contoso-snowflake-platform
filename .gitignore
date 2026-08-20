@@ -2,18 +2,31 @@
 __pycache__/
 .pytest_cache/
 .ruff_cache/
-state.json
-product_snapshot.json
-catalog.json
-gold/models/
-gold/macros/
-gold/tests/
-gold/target/
-gold/dbt_packages/
-gold/logs/
+
+# The emulator's own storage: the warehouse file and the workspace credential.
+# `make token` copies the credential into the product; nothing else crosses.
 data/
 
 # Generated from contoso-sources at `make up` -- never edited, never committed.
 compose/.generated/
-# The internal stage, written by ingest and read by COPY INTO.
+
+# THE PRODUCT THIS PLATFORM IS POINTED AT -- a mount point, never content.
+# Clone or symlink a product here, or pass PRODUCT=../my-product.
+/product
+
+# LEFTOVERS FROM BEFORE THE SPLIT. These are the product's directories now: dbt
+# runs with the product as its working directory, so gold/, silver/, the stage
+# and every metrics file are written THERE. They are still ignored here because
+# an existing checkout has them on disk, and a stale copy sitting in a platform
+# is exactly the second product this split exists to prevent.
+gold/
+silver/
 stages/
+state.json
+catalog.json
+product_snapshot.json
+bronze_metrics.json
+silver_metrics.json
+
+# Local tooling
+.nwave/
