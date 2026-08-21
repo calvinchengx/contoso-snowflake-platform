@@ -106,10 +106,23 @@ def test_the_platform_holds_no_product():
     #
     # ./product is exempt: a dbt project appearing THERE is the product being
     # run, not the platform holding one.
+    #
+    # ./stages is exempt for the same reason one step further out: it is the
+    # emulator's INTERNAL STAGE, gitignored, and the only route into it is the
+    # driver's PUT. Now that silver and gold run as `EXECUTE DBT PROJECT`, the
+    # step uploads the product's project there and a real `dbt_project.yml`
+    # appears under `stages/silver_project/` on every run. That is the product
+    # being RUN, held by the warehouse -- nothing there is authored here and
+    # nothing there is committed.
+    #
+    # Exempted by name rather than by widening the glob, because the thing this
+    # test exists to catch -- a project checked in under `gold/`, which is
+    # exactly how one survived the split -- must still fail.
+    exempt = {"product", "stages"}
     strays = [
         d.relative_to(ROOT).as_posix()
         for d in ROOT.rglob("dbt_project.yml")
-        if "product" not in d.relative_to(ROOT).parts[:1] and ".venv" not in d.parts
+        if d.relative_to(ROOT).parts[0] not in exempt and ".venv" not in d.parts
     ]
     assert not strays, f"a dbt project is still in the platform: {strays}"
 
