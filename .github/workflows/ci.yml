@@ -23,11 +23,23 @@ jobs:
       - uses: actions/checkout@v7
         with:
           path: snowflake-platform-tasks
-      # NO SIBLING CHECKOUTS. They were here because pyproject.toml resolved
-      # contoso-data-product and snowflake-target from paths beside this
-      # repository. Both went to the product in the split, and this platform now
-      # declares no runtime dependency at all -- so the repo tests need nothing
-      # but this repository, which is the point.
+      # ONE SIBLING, AND IT IS NOT A RUNTIME DEPENDENCY. The rule this replaces
+      # said no sibling checkouts at all: contoso-data-product and
+      # snowflake-target both went to the product in the split, and this
+      # platform declares no runtime dependency on anything. That is still
+      # true and still the point.
+      #
+      # What is checked out here is a test INPUT. `scripts/sources.py`
+      # generates the vendor compose fragment from `contoso-sources`'
+      # declaration, and the test that keeps `vendor-ports.json` honest
+      # regenerates that fragment to compare. Committing a copy of the
+      # declaration instead would be the duplicate this family refuses; a test
+      # that SKIPPED without it would be worse still, because CI is the only
+      # place the check matters and it would pass there by never running.
+      - uses: actions/checkout@v7
+        with:
+          repository: calvinchengx/contoso-sources
+          path: contoso-sources
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
         with:
           version: "0.12.3"
