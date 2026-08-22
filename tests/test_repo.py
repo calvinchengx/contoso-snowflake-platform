@@ -8,6 +8,7 @@ contoso-data-product-snowflake-tasks with the code they describe.
 from __future__ import annotations
 
 import importlib.util
+import os
 import pathlib
 import re
 import subprocess
@@ -395,4 +396,58 @@ def test_openmetadata_comes_from_the_mirror():
         )
     assert not any("getcollate" in i for i in images), (
         "an image still comes straight from the vendor registry"
+    )
+
+
+def test_the_committed_vendor_ports_match_what_the_generator_emits():
+    """`vendor-ports.json` is the only committed record of these host ports.
+
+    The vendor compose fragment is GENERATED at `make up` and gitignored, so
+    nothing in any repository recorded which host ports it publishes: the
+    family registry could not see them, and the check that refuses two members
+    claiming one host port was blind to them. This file is what the hub reads;
+    this test is what keeps it true.
+
+    IT REFUSES RATHER THAN SKIPS when the declaration is missing. A skip here
+    would be invisible in CI, and CI is the only place it matters -- the first
+    version skipped, and this repository's test job did not check out
+    contoso-sources at all, so the check would have passed by never running.
+    The job now places it beside this one, the way the Fabric platform's
+    already did.
+
+    Regenerate with:
+        uv run --no-project python scripts/sources.py \\
+            ../contoso-sources/sources.yaml $(cd ../contoso-sources && pwd) \\
+            --ports > vendor-ports.json
+    """
+    import json
+    import subprocess
+    import sys
+
+    root = pathlib.Path(__file__).resolve().parents[1]
+    sources = pathlib.Path(os.environ.get("SOURCES", root.parent / "contoso-sources"))
+    assert (sources / "sources.yaml").is_file(), (
+        f"no contoso-sources declaration at {sources}; this test generates the "
+        "vendor fragment from it. Clone it beside this repository or set SOURCES."
+    )
+
+    out = subprocess.run(
+        [
+            sys.executable,
+            str(root / "scripts" / "sources.py"),
+            str(sources / "sources.yaml"),
+            str(sources),
+            "--ports",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    emitted = json.loads(out.stdout)
+    assert emitted, (
+        "the generator published no host ports — this check would be vacuous"
+    )
+    committed = json.loads((root / "vendor-ports.json").read_text(encoding="utf-8"))
+    assert committed == emitted, (
+        "vendor-ports.json is stale; regenerate it (see this test's docstring)"
     )
