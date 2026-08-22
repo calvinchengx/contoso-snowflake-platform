@@ -35,7 +35,7 @@ STEP := $(UV) run --directory $(PRODUCT) --frozen
 export PRODUCT_STAGE := $(PRODUCT_ABS)/stages
 export SNOWFLAKE_STAGES := $(PRODUCT_ABS)/stages
 
-.PHONY: help doctor up down config token verify test lint
+.PHONY: help doctor up down config token verify test lint witness logs
 
 help:
 	@echo "  doctor   Check prerequisites"
@@ -54,6 +54,9 @@ up:
 
 down:
 	$(UV) run --frozen --group dev python scripts/compose.py down -v
+
+logs:  ## Follow the stack's logs (SVC=<service> to narrow)
+	$(UV) run --frozen --group dev python scripts/compose.py logs -f --tail 100 $(SVC)
 
 config:
 	$(UV) run --frozen --group dev python scripts/compose.py config
@@ -77,6 +80,8 @@ verify: doctor token
 	$(STEP) --group dbt python steps/silver.py
 	$(STEP) --group dbt python steps/gold.py
 	$(STEP) --group engine python steps/govern.py
+
+witness: verify ## The family's one word for `verify`: run the cell, fail if it fails
 
 test:
 	$(UV) run --frozen --group dev python -m pytest tests -q
