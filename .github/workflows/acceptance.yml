@@ -47,9 +47,20 @@ jobs:
         with:
           repository: calvinchengx/contoso-sources
           path: contoso-sources
+      # THE FAMILY'S FIGURES, from the repository that owns them. This checkout
+      # was already here and unused; the step at the end of this job is what it
+      # is now for.
+      #
+      # PINNED BY SHA, not tracking main. Core's own rules say a release is the
+      # unit of change and nothing tracks main, and a nightly whose expectations
+      # can move without a reviewed commit here is a nightly that can be turned
+      # green by editing another repository. A SHA is also what this workflow
+      # already does for every third-party action. Move it deliberately, and
+      # only when the family's numbers move.
       - uses: actions/checkout@v7
         with:
           repository: calvinchengx/contoso-data-product
+          ref: 2cf7bae8a1e1f4a8cddd2cd5510d435e16febb3b
           path: contoso-data-product
       - uses: actions/checkout@v7
         with:
@@ -93,6 +104,20 @@ jobs:
       - run: make config
       - run: make up PRODUCT=../contoso-data-product-snowflake-tasks
       - run: make verify PRODUCT=../contoso-data-product-snowflake-tasks
+      # THE NUMBERS, not merely the run (G50). Everything above proves the
+      # pipeline executed; this is the only step that can fail because gold
+      # returned different money. `make verify` writes product_snapshot.json and
+      # until now nothing read it back, so a cell whose gold silently drifted
+      # would have stayed green indefinitely.
+      #
+      # No `if: always()`. A failed run has no numbers worth checking, and a
+      # missing snapshot after a SUCCESSFUL run is a finding the script reports
+      # as one rather than skipping.
+      - name: Assert the figures core publishes
+        run: |
+          python3 ../contoso-data-product/scripts/assert_snapshot.py \
+            --label snowflake-platform-tasks \
+            ../contoso-data-product-snowflake-tasks/product_snapshot.json
       - if: github.event_name == 'repository_dispatch'
         name: Adopt the version this run just verified
         env:
