@@ -241,7 +241,33 @@ def fragment(decl: dict, sources_dir: str, pins: dict) -> dict:
     return {"services": services}
 
 
+def host_ports(frag: dict) -> dict:
+    """{service: [host ports]} for everything this fragment publishes.
+
+    DERIVED FROM THE FRAGMENT, not from a second table beside it. A function
+    that re-listed the host ports here would be a copy free to drift from what
+    compose is actually handed, which is the whole reason this is written down.
+
+    It exists because the fragment is GENERATED at `make up` and gitignored, so
+    nothing committed anywhere recorded these ports: the family registry could
+    not see them, and neither could the check that refuses two members claiming
+    one host port.
+    """
+    out: dict[str, list[int]] = {}
+    for name, svc in frag.get("services", {}).items():
+        for mapping in svc.get("ports", []):
+            host = str(mapping).split(":")[0]
+            if host.isdigit():
+                out.setdefault(name, []).append(int(host))
+    return {k: sorted(v) for k, v in sorted(out.items())}
+
+
 def main() -> int:
+    if len(sys.argv) == 4 and sys.argv[3] == "--ports":
+        sys.argv = sys.argv[:3]
+        ports = True
+    else:
+        ports = False
     if len(sys.argv) != 3:
         sys.exit("usage: sources.py <path-to-sources.yaml> <sources-dir-abs>")
     decl = _load(pathlib.Path(sys.argv[1]))
@@ -265,7 +291,8 @@ def main() -> int:
             if key not in pins:
                 sys.exit(f"platform: vendor {v['name']!r} is kind={v.get('kind')!r} but "
                          f"{versions} does not pin {key}; this platform will not guess it")
-    print(json.dumps(fragment(decl, sys.argv[2], pins), indent=2))
+    frag = fragment(decl, sys.argv[2], pins)
+    print(json.dumps(host_ports(frag) if ports else frag, indent=2))
     return 0
 
 

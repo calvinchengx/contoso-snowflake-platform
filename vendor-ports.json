@@ -1,0 +1,20 @@
+{
+  "contoso-erp-broker": [
+    19096
+  ],
+  "contoso-erp-connect": [
+    18293
+  ],
+  "contoso-erp-db": [
+    55436
+  ],
+  "contoso-pos": [
+    18290
+  ],
+  "contoso-reference": [
+    18292
+  ],
+  "contoso-web": [
+    18291
+  ]
+}
