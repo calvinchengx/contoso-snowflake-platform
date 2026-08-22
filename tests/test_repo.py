@@ -244,6 +244,32 @@ def test_the_acceptance_run_checks_out_the_product_it_runs():
     assert "make verify PRODUCT=../contoso-data-product-snowflake-tasks" in wf
 
 
+def test_the_acceptance_run_asserts_the_numbers_and_not_only_the_run():
+    """A nightly that proves the pipeline RAN proves nothing about the answer.
+
+    G50: across all seven platforms with an acceptance workflow, none compared
+    a snapshot against an expected value. `make verify` writes
+    product_snapshot.json and nothing read it back, so gold could have returned
+    different money indefinitely behind a green tick.
+
+    The core checkout must be PINNED. Left tracking main, this cell's
+    expectations could move without a reviewed commit here -- a nightly that
+    another repository can turn green.
+    """
+    wf = (ROOT / ".github" / "workflows" / "acceptance.yml").read_text(encoding="utf-8")
+    assert "scripts/assert_snapshot.py" in wf, (
+        "the acceptance run never asserts the figures core publishes"
+    )
+    assert "product_snapshot.json" in wf, (
+        "the assert step names no snapshot, so it checks nothing"
+    )
+    core = wf[wf.index("repository: calvinchengx/contoso-data-product\n") :]
+    ref = core[: core.index("path:")]
+    assert re.search(r"ref: [0-9a-f]{40}", ref), (
+        "the contoso-data-product checkout is not pinned to a commit"
+    )
+
+
 def test_the_acceptance_run_adopts_every_file_the_bump_touches():
     """A half-adopted pin publishes a main that contradicts itself.
 
